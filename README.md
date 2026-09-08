@@ -1,5 +1,5 @@
 # WebChat
-Simple client-server app with multiuser chat
+Simple client-server app
 
 # Download
 git clone https://github.com/Parsifal23/WebChat.git
