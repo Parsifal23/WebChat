@@ -1,0 +1,16 @@
+app*/
+release/
+debug/
+*.user
+*.Release
+*.Debug
+*.opt
+Makefile
+*.txt
+*qmake*
+*.obj
+*.o
+*.so
+*.log
+*.dat
+LastFilePath.json
