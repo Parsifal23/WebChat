@@ -79,30 +79,36 @@ void Client::slotReadyRead()
           QString strToClient = strInterlocutors;
           strToClient.remove(0, iPosFrom + 5);
 
-          if (strFromClient == _strInterlocutor) {
-            strMsgBlock.replace( 0, iPosTo + 3, QString("<%1>: ").arg(strFromClient));
-            ui->Chat->append(QString("\t%1\n%2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
-                             .arg(strMsgBlock));
-            qDebug() << "Msg from server: " <<
-                        QString("%1 %2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
-                        .arg(strMsgBlock);
+          // Сообщение мне
+          if (strToClient == _strUsername) {
+            // Сообщение пришло от выбранного собеседника
+            if (strFromClient == _strInterlocutor) {
+              strMsgBlock.replace( 0, iPosTo + 3, QString("<%1>: ").arg(strFromClient));
+              ui->Chat->append(QString("\t%1\n%2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
+                                       .arg(strMsgBlock));
+              qDebug() << "Msg from server: " <<
+                      QString("%1 %2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
+                          .arg(strMsgBlock);
+            }
+            // Сообщение мне, но без выбранного собеседника. Добавляется + нику отправителя
+            else {
+              auto listItems = ui->UserList->findItems(strFromClient, Qt::MatchCaseSensitive);
+              if (!listItems.empty()) {
+                int rowItem = ui->UserList->row(listItems.at(0));
+                auto Item = ui->UserList->takeItem(rowItem);
+                Item->setText(QString("%1 +").arg(strFromClient));
+                ui->UserList->insertItem(0, Item);
+              }
+              qDebug() << _strUsername << " Msg from server: " <<
+              QString("%1 %2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
+                          .arg(strMsgBlock);
+            }
           }
+          // Сообщение от меня в чат с выбранным собеседником
           else if (strFromClient == _strUsername && strToClient == _strInterlocutor) {
             strMsgBlock.replace( 0, iPosTo + 3, "<Вы>: ");
             ui->Chat->append(QString("\t%1\n%2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
                              .arg(strMsgBlock));
-            qDebug() << _strUsername << " Msg from server: " <<
-                        QString("%1 %2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
-                        .arg(strMsgBlock);
-          }
-          else if (strFromClient != _strInterlocutor && strFromClient != _strUsername) {
-            auto listItems = ui->UserList->findItems(strFromClient, Qt::MatchCaseSensitive);
-            if (!listItems.empty()) {
-              int rowItem = ui->UserList->row(listItems.at(0));
-              auto Item = ui->UserList->takeItem(rowItem);
-              Item->setText(QString("%1 +").arg(strFromClient));
-              ui->UserList->insertItem(0, Item);
-            }
             qDebug() << _strUsername << " Msg from server: " <<
                         QString("%1 %2").arg(ReceivedMsgDateTime.toString("dd.MM.yyyy hh:mm:ss"))
                         .arg(strMsgBlock);
@@ -179,11 +185,11 @@ void Client::on_BtnConnect_clicked()
 void Client::slotGetHistory(QListWidgetItem* Item) // в разработке
 {
   _strInterlocutor = Item->text();
-  // if (_strInterlocutor.contains(" +")) {
-  //   int iPosMarkerMsg = _strInterlocutor.indexOf(" +");
-  //   _strInterlocutor.truncate(iPosMarkerMsg);
-  //   Item->setText(_strInterlocutor);
-  // }
+  // Если надо выбрать собеседника, но у него в нике есть пометка, что есть непрочитанные сообщения
+  if (_strInterlocutor.endsWith(" +")) {
+    _strInterlocutor.chop(2);
+    Item->setText(_strInterlocutor);
+  }
   ui->BtnSend->setEnabled(true);
   ui->InterlocutorLbl->setText(ui->InterlocutorLbl->text() + _strInterlocutor);
 
