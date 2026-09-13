@@ -13,9 +13,6 @@ public:
   /** @brief Конструктор */
   Server();
 
-  /** @brief Сокет при новом подключении */
-  QTcpSocket* _Socket;
-
 public  slots:
   /** @brief Слот для входящего подключения */
   void incomingConnection(qintptr pSockDescriptor) override;
@@ -37,7 +34,7 @@ private:
   };
 
   /** @brief Отправка данных клиенту*/
-  void vSendClient(_EnMessageTypes enMsgType, QString strToCLient, QString strMsg);
+  void vSendClient(_EnMessageTypes enMsgType, QString strToCLient, QString strMsg, QTcpSocket* Socket);
 
   /** @brief Словарь всех подключенных сокетов. Ключ - сокет-клиент, значение - Username.
     * По-умолчанию, значение - "Username"*/
@@ -45,7 +42,4 @@ private:
 
   /** @brief Тип данных для передачи в сокете */
   QByteArray _arrData;
-
-  /** @brief Размер отправляемого сообщения */
-  quint16 _uiNextBlockSize;  
 };
