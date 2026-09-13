@@ -5,7 +5,6 @@
 //-------------------------------------------------------------------------------------------------
 Server::Server()
 {
-  _uiNextBlockSize = 0;
   if (listen(QHostAddress::LocalHost, 1234)) {
     qDebug() << "Server started.";
   }
@@ -16,45 +15,49 @@ Server::Server()
 //-------------------------------------------------------------------------------------------------
 void Server::incomingConnection(qintptr iSockDescriptor)
 {
-  _Socket = new QTcpSocket;
-  _Socket->setSocketDescriptor(iSockDescriptor);
-  qDebug() << "New socket in port " << _Socket->peerPort();
-  connect(_Socket, &QTcpSocket::readyRead, this, &Server::slotReadyRead);
-  connect(_Socket, &QTcpSocket::disconnected, this, &Server::slotDeleteSocket);
-  _mapSockets[_Socket] = "Username";
+  // Сокет при новом подключении
+  QTcpSocket* Socket = new QTcpSocket;
+  Socket->setSocketDescriptor(iSockDescriptor);
+  qDebug() << "New socket in port " << Socket->peerPort();
+  connect(Socket, &QTcpSocket::readyRead, this, &Server::slotReadyRead);
+  connect(Socket, &QTcpSocket::disconnected, this, &Server::slotDeleteSocket);
+  _mapSockets[Socket] = "Username";
   qDebug() << "Client connected " << iSockDescriptor;
   qDebug() << "Count of sockets " << _mapSockets.size();
 }
 //-------------------------------------------------------------------------------------------------
 void Server::slotReadyRead()
 {
-  _Socket = qobject_cast<QTcpSocket*>(sender());
-  QDataStream streamIn(_Socket);
+  // Сокет, с которого пришло сообщение
+  QTcpSocket* Socket = qobject_cast<QTcpSocket*>(sender());
+  QDataStream streamIn(Socket);
   if (streamIn.status() == QDataStream::Ok) {
-    qDebug() << "Reading from client " << _mapSockets[_Socket];
+    qDebug() << "Reading from client " << _mapSockets[Socket];
+
+    // Размер отправляемого сообщения
+    quint16 uiNextBlockSize = 0;
 
     while (true) {
-      if (_uiNextBlockSize == 0) {
-        if (_Socket->bytesAvailable() < 2) {
-          qDebug() << "In socket less 2 bytes: " << _Socket->bytesAvailable();
+      if (uiNextBlockSize == 0) {
+        if (Socket->bytesAvailable() < 2) {
+          qDebug() << "In socket less 2 bytes: " << Socket->bytesAvailable();
           break;
         }
-        streamIn >> _uiNextBlockSize;
-        qDebug() << "First block of msg: " << _uiNextBlockSize;
+        streamIn >> uiNextBlockSize;
+        qDebug() << "First block of msg: " << uiNextBlockSize;
       }
-      if (_Socket->bytesAvailable() < _uiNextBlockSize) {
-        qDebug() << "Bytes for reading less size of whole msg: " << _Socket->bytesAvailable();
+      if (Socket->bytesAvailable() < uiNextBlockSize) {
+        qDebug() << "Bytes for reading less size of whole msg: " << Socket->bytesAvailable();
         break;
       }
       QString strMsgBlock;
       unsigned short uiMsgType;
       streamIn >> uiMsgType;
-      _uiNextBlockSize = 0;
 
       switch (static_cast<_EnMessageTypes>(uiMsgType)) {
         case _EnMessageTypes::enSaveUsername: {
           streamIn >> strMsgBlock;
-          _mapSockets[_Socket] = strMsgBlock;
+          _mapSockets[Socket] = strMsgBlock;
           QString strUsers;
           if (_mapSockets.size() > 1) {
             QStringList listUsers;
@@ -66,7 +69,7 @@ void Server::slotReadyRead()
           else {
             break;
           }
-          vSendClient(_EnMessageTypes::enUpdateUserList, {""}, strUsers);
+          vSendClient(_EnMessageTypes::enUpdateUserList, {""}, strUsers, Socket);
           break;
         }
 
@@ -81,7 +84,7 @@ void Server::slotReadyRead()
           QString strToCLient = strInterlocutors;
           strToCLient.remove(0, iPosFrom + 5);
 
-          vSendClient(_EnMessageTypes::enChatMessage, strToCLient, strMsgBlock);
+          vSendClient(_EnMessageTypes::enChatMessage, strToCLient, strMsgBlock, Socket);
           qDebug() << "Msg from client: "
                    << QString("%1 %2")
                       .arg(QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"))
@@ -105,15 +108,15 @@ void Server::slotReadyRead()
 //-------------------------------------------------------------------------------------------------
 void Server::slotDeleteSocket()
 {
-  _Socket = qobject_cast<QTcpSocket*>(sender());
-  qDebug() << "Client " << _mapSockets[_Socket] << " disconnected in port " << _Socket->peerPort();
-  _mapSockets.remove(_Socket);
+  QTcpSocket* Socket = qobject_cast<QTcpSocket*>(sender());
+  qDebug() << "Client " << _mapSockets[Socket] << " disconnected in port " << Socket->peerPort();
+  _mapSockets.remove(Socket);
   qDebug() << "Count of sockets after deleting " << _mapSockets.size();
-  qDebug() << "Server.Disconnect socket with error " << _Socket->error();
-  _Socket->deleteLater();
+  qDebug() << "Server.Disconnect socket with error " << Socket->error();
+  Socket->deleteLater();
 }
 //-------------------------------------------------------------------------------------------------
-void Server::vSendClient(_EnMessageTypes enMsgType, QString strToCLient, QString strMsg)
+void Server::vSendClient(_EnMessageTypes enMsgType, QString strToCLient, QString strMsg, QTcpSocket* Socket)
 {
   _arrData.clear();
   QDataStream streamOut(&_arrData, QIODevice::WriteOnly);
@@ -137,7 +140,7 @@ void Server::vSendClient(_EnMessageTypes enMsgType, QString strToCLient, QString
       streamOut.device()->seek(0);
       // Ставим указатель записи в начало буфера, чтобы записать вес самого сообщения, типа сообщения, даты в 2 байтовую переменную
       streamOut << quint16(_arrData.size() - static_cast<int>(sizeof (quint16)));
-      _Socket->write(_arrData);
+      Socket->write(_arrData);
       auto Socket = _mapSockets.key(strToCLient, nullptr);
       if (Socket != nullptr) {
         Socket->write(_arrData);
